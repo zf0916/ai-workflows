@@ -59,7 +59,7 @@ uv run python patterns/workflows/01_standard_done.py
 ```
 
 #### **Why uv?**
-Using `uv` ensures that the `.venv` is created automatically and that all dependencies are locked to the exact versions specified in `uv.lock`. For a detailed guide on using `uv` with this project, check out [Dave Ebbelaar's Guide on Virtual Environments](https://python.datalumina.com/tools/dependencies/virtual-env).
+Using `uv` ensures that the `.venv` is created automatically and that all dependencies are locked to the exact versions specified in `uv.lock`. For a detailed guide on using `uv` with this project, check out [Dave Ebbelaar's Guide](https://python.datalumina.com/tools/dependencies/virtual-env).
 
 ---
 
