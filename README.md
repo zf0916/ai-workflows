@@ -84,5 +84,4 @@ Using `uv` ensures that the `.venv` is created automatically and that all depend
 ├── pyproject.toml                # Project dependencies (uv)
 ├── uv.lock                       # Dependency lockfile
 └── main.py                       # Entry point
-
----
+```
