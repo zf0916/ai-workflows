@@ -16,13 +16,26 @@ PROVIDER = "lmstudio"
 client, model = get_llm_client(PROVIDER)
 
 # Execution
-completion = client.chat.completions.create(
-    model=model,
-    messages=[
-        {"role": "system", "content": "Respond directly. No reasoning."},
-        {"role": "user", "content": "Write a limerick about Python."},
-    ],
-)
+
+if PROVIDER == "openai":
+    # openai model response
+    completion = client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {"role": "system", "content": "Respond directly. No reasoning."},
+            {"role": "user", "content": "Write a limerick about Python."},
+        ],
+    )
+else:
+    # local model response
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": "Respond directly. No reasoning."},
+            {"role": "user", "content": "Write a limerick about Python."},
+        ],
+    )
+
 
 print(f"--- Response from {PROVIDER} ({model}) ---")
 print(completion.choices[0].message.content)

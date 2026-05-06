@@ -146,19 +146,60 @@ class BlogOrchestrator:
 
     def get_plan(self, topic: str, target_length: int, style: str) -> OrchestratorPlan:
         """Get orchestrator's blog structure plan"""
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": ORCHESTRATOR_PROMPT.format(
-                        topic=topic, target_length=target_length, style=style
-                    ),
-                }
-            ],
-            response_format=OrchestratorPlan,
-        )
-        return completion.choices[0].message.parsed
+        if PROVIDER == "openai":
+            # openai model response
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": ORCHESTRATOR_PROMPT.format(
+                            topic=topic, target_length=target_length, style=style
+                        ),
+                    }
+                ],
+                response_format=OrchestratorPlan,
+            )
+            result = completion.choices[0].message.parsed
+        else:
+            # local model response
+            orchestrator_schema = OrchestratorPlan.model_json_schema()
+
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": ORCHESTRATOR_PROMPT.format(
+                            topic=topic, target_length=target_length, style=style
+                        ),
+                    }
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "orchestrator_schema",
+                        "schema": orchestrator_schema,
+                        "strict": True,
+                    },
+                },
+            )
+
+            message = completion.choices[0].message
+            # Check if reasoning_content exists in the raw response
+            raw_resp = completion.model_dump()
+            reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+            content = message.content or ""
+
+            # Use reasoning if content is empty (common in Qwen 3.5 bug)
+            final_json = content if content.strip() else reasoning
+
+            if not final_json:
+                raise ValueError("Both content and reasoning_content are empty.")
+
+            result = OrchestratorPlan.model_validate_json(final_json)
+
+        return result
 
     def write_section(self, topic: str, section: SubTask) -> SectionContent:
         """Worker: Write a specific blog section with context from previous sections.
@@ -178,26 +219,74 @@ class BlogOrchestrator:
             ]
         )
 
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": WORKER_PROMPT.format(
-                        topic=topic,
-                        section_type=section.section_type,
-                        description=section.description,
-                        style_guide=section.style_guide,
-                        target_length=section.target_length,
-                        previous_sections=previous_sections
-                        if previous_sections
-                        else "This is the first section.",
-                    ),
-                }
-            ],
-            response_format=SectionContent,
-        )
-        return completion.choices[0].message.parsed
+        if PROVIDER == "openai":
+            # openai model response
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": WORKER_PROMPT.format(
+                            topic=topic,
+                            section_type=section.section_type,
+                            description=section.description,
+                            style_guide=section.style_guide,
+                            target_length=section.target_length,
+                            previous_sections=previous_sections
+                            if previous_sections
+                            else "This is the first section.",
+                        ),
+                    }
+                ],
+                response_format=SectionContent,
+            )
+            result = completion.choices[0].message.parsed
+        else:
+            # local model response
+            section_schema = SectionContent.model_json_schema()
+
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": WORKER_PROMPT.format(
+                            topic=topic,
+                            section_type=section.section_type,
+                            description=section.description,
+                            style_guide=section.style_guide,
+                            target_length=section.target_length,
+                            previous_sections=previous_sections
+                            if previous_sections
+                            else "This is the first section.",
+                        ),
+                    }
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "section_schema",
+                        "schema": section_schema,
+                        "strict": True,
+                    },
+                },
+            )
+
+            message = completion.choices[0].message
+            # Check if reasoning_content exists in the raw response
+            raw_resp = completion.model_dump()
+            reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+            content = message.content or ""
+
+            # Use reasoning if content is empty (common in Qwen 3.5 bug)
+            final_json = content if content.strip() else reasoning
+
+            if not final_json:
+                raise ValueError("Both content and reasoning_content are empty.")
+
+            result = SectionContent.model_validate_json(final_json)
+
+        return result
 
     def review_post(self, topic: str, plan: OrchestratorPlan) -> ReviewFeedback:
         """Reviewer: Analyze and improve overall cohesion"""
@@ -208,21 +297,64 @@ class BlogOrchestrator:
             ]
         )
 
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": REVIEWER_PROMPT.format(
-                        topic=topic,
-                        audience=plan.target_audience,
-                        sections=sections_text,
-                    ),
-                }
-            ],
-            response_format=ReviewFeedback,
-        )
-        return completion.choices[0].message.parsed
+        if PROVIDER == "openai":
+            # openai model response
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": REVIEWER_PROMPT.format(
+                            topic=topic,
+                            audience=plan.target_audience,
+                            sections=sections_text,
+                        ),
+                    }
+                ],
+                response_format=ReviewFeedback,
+            )
+            result = completion.choices[0].message.parsed
+        else:
+            # local model response
+            review_schema = ReviewFeedback.model_json_schema()
+
+            completion = client.beta.chat.completions.parse(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": REVIEWER_PROMPT.format(
+                            topic=topic,
+                            audience=plan.target_audience,
+                            sections=sections_text,
+                        ),
+                    }
+                ],
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "review_schema",
+                        "schema": review_schema,
+                        "strict": True,
+                    },
+                },
+            )
+
+            message = completion.choices[0].message
+            # Check if reasoning_content exists in the raw response
+            raw_resp = completion.model_dump()
+            reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+            content = message.content or ""
+
+            # Use reasoning if content is empty (common in Qwen 3.5 bug)
+            final_json = content if content.strip() else reasoning
+
+            if not final_json:
+                raise ValueError("Both content and reasoning_content are empty.")
+
+            result = ReviewFeedback.model_validate_json(final_json)
+
+        return result
 
     def write_blog(
         self, topic: str, target_length: int = 1000, style: str = "informative"

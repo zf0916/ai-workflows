@@ -1,9 +1,7 @@
 import json
-import os
 import sys
 from pathlib import Path
 
-from openai import OpenAI
 from pydantic import BaseModel, Field
 
 # root path for helper import
@@ -110,31 +108,41 @@ class KBResponse(BaseModel):
     source: int = Field(description="The record id of the answer.")
 
 
-# Force Gemma to respect the KBResponse structure (answer and source)
-# messages.append(
-#     {
-#         "role": "user",
-#         "content": (
-#             "Based on the knowledge base results above, provide the final answer. "
-#             "You must return ONLY a JSON object with these keys: "
-#             "'answer' (a string) and 'source' (the integer record id). "
-#             "Do not include any other text."
-#         ),
-#     }
-# )
+if PROVIDER == "openai":
+    # openai models response (using .parse and tools included)
+    completion_2 = client.beta.chat.completions.parse(
+        model="gpt-4o",
+        messages=messages,
+        tools=tools,
+        response_format=KBResponse,
+    )
 
-completion_2 = client.beta.chat.completions.parse(
-    model=model,
-    messages=messages,
-    tools=tools,
-    response_format=KBResponse,
-)
+    final_response = completion_2.choices[0].message.parsed
+else:
+    # local models response (using .create and tools omitted)
+    kb_schema = KBResponse.model_json_schema()
+
+    completion_2 = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "KB_response_schema",
+                "schema": kb_schema,
+                "strict": True,
+            },
+        },
+    )
+
+    final_response = KBResponse.model_validate_json(
+        completion_2.choices[0].message.content
+    )
 
 # --------------------------------------------------------------
 # Step 5: Check model response
 # --------------------------------------------------------------
 
-final_response = completion_2.choices[0].message.parsed
 final_response.answer
 final_response.source
 
@@ -147,10 +155,17 @@ messages = [
     {"role": "user", "content": "What is the weather in Tokyo?"},
 ]
 
-completion_3 = client.beta.chat.completions.parse(
-    model=model,
-    messages=messages,
-    tools=tools,
-)
+if PROVIDER == "openai":
+    completion_3 = client.beta.chat.completions.parse(
+        model=model,
+        messages=messages,
+        tools=tools,
+    )
+else:
+    completion_3 = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        tools=tools,
+    )
 
 completion_3.choices[0].message.content

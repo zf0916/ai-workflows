@@ -67,8 +67,8 @@ messages = [
     {"role": "system", "content": system_prompt},
     {
         "role": "user",
-        "content": "What's the weather like in Paris today?",
-        # "content": "What's the weather like in Paris today? (Note: Paris is at lat 48.85, long 2.35)",
+        # "content": "What's the weather like in Paris today?",
+        "content": "What's the weather like in Paris today? (Note: Paris is at lat 48.85, long 2.35)",  # Extra info needed for small models like gemma4:e4b
     },
 ]
 
@@ -94,42 +94,31 @@ def call_function(name, args):
         return get_weather(**args)
 
 
-# # Check if the model actually wants to call a tool (for local models)
-# tool_calls = completion.choices[0].message.tool_calls
+# Check if tool call succeeds
+tool_calls = completion.choices[0].message.tool_calls
 
-# if tool_calls:
-#     for tool_call in tool_calls:
-#         name = tool_call.function.name
-#         args = json.loads(tool_call.function.arguments)
+if tool_calls:
+    for tool_call in tool_calls:
+        name = tool_call.function.name
+        args = json.loads(tool_call.function.arguments)
 
-#         # Append the assistant's call to the conversation
-#         messages.append(completion.choices[0].message)
+        # Append the assistant's call to the conversation
+        messages.append(completion.choices[0].message)
 
-#         result = call_function(name, args)
+        result = call_function(name, args)
 
-#         # Append the tool result
-#         messages.append(
-#             {
-#                 "role": "tool",
-#                 "tool_call_id": tool_call.id,
-#                 "content": json.dumps(result),
-#             }
-#         )
-# else:
-#     # Handle the case where the model just replied with text
-#     print("The model did not call a tool. Response:")
-#     print(completion.choices[0].message.content)
-
-
-for tool_call in completion.choices[0].message.tool_calls:
-    name = tool_call.function.name
-    args = json.loads(tool_call.function.arguments)
-    messages.append(completion.choices[0].message)
-
-    result = call_function(name, args)
-    messages.append(
-        {"role": "tool", "tool_call_id": tool_call.id, "content": json.dumps(result)}
-    )
+        # Append the tool result
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result),
+            }
+        )
+else:
+    # Handle the case where the model just replied with text
+    print("The model did not call a tool. Response:")
+    print(completion.choices[0].message.content)
 
 # --------------------------------------------------------------
 # Step 4: Supply result and call model again
@@ -145,17 +134,42 @@ class WeatherResponse(BaseModel):
     )
 
 
-completion_2 = client.beta.chat.completions.parse(
-    model=model,
-    messages=messages,
-    tools=tools,
-    response_format=WeatherResponse,
-)
+# Call the standard completions endpoint
+
+if PROVIDER == "openai":
+    # openai models response (using .parse and tools included)
+    completion_2 = client.beta.chat.completions.parse(
+        model=model,
+        messages=messages,
+        tools=tools,
+        response_format=WeatherResponse,
+    )
+
+    final_response = completion_2.choices[0].message.content
+else:
+    # local models response (using .create and tools omitted)
+    weather_schema = WeatherResponse.model_json_schema()
+
+    completion_2 = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "weather_response_schema",
+                "schema": weather_schema,
+                "strict": True,
+            },
+        },
+    )
+
+    final_response = WeatherResponse.model_validate_json(
+        completion_2.choices[0].message.content
+    )
 
 # --------------------------------------------------------------
 # Step 5: Check model response
 # --------------------------------------------------------------
 
-final_response = completion_2.choices[0].message.parsed
 final_response.temperature
 final_response.response

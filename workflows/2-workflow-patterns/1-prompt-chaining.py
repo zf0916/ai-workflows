@@ -77,21 +77,61 @@ def extract_event_info(user_input: str) -> EventExtraction:
     today = datetime.now()
     date_context = f"Today is {today.strftime('%A, %B %d, %Y')}."
 
-    completion = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": f"{date_context} Analyze if the text describes a calendar event.",
+    if PROVIDER == "openai":
+        # openai model response
+        completion = client.beta.chat.completions.parse(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{date_context} Analyze if the text describes a calendar event.",
+                },
+                {"role": "user", "content": user_input},
+            ],
+            response_format=EventExtraction,
+        )
+        result = completion.choices[0].message.parsed
+    else:
+        # local model response
+        event_extract_schema = EventExtraction.model_json_schema()
+
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{date_context} Analyze if the text describes a calendar event.",
+                },
+                {"role": "user", "content": user_input},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "event_extract_schema",
+                    "schema": event_extract_schema,
+                    "strict": True,
+                },
             },
-            {"role": "user", "content": user_input},
-        ],
-        response_format=EventExtraction,
-    )
-    result = completion.choices[0].message.parsed
+        )
+
+        message = completion.choices[0].message
+        # Check if reasoning_content exists in the raw response
+        raw_resp = completion.model_dump()
+        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+        content = message.content or ""
+
+        # Use reasoning if content is empty (common in Qwen 3.5 bug)
+        final_json = content if content.strip() else reasoning
+
+        if not final_json:
+            raise ValueError("Both content and reasoning_content are empty.")
+
+        result = EventExtraction.model_validate_json(final_json)
+
     logger.info(
         f"Extraction complete - Is calendar event: {result.is_calendar_event}, Confidence: {result.confidence_score:.2f}"
     )
+
     return result
 
 
@@ -102,18 +142,57 @@ def parse_event_details(description: str) -> EventDetails:
     today = datetime.now()
     date_context = f"Today is {today.strftime('%A, %B %d, %Y')}."
 
-    completion = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": f"{date_context} Extract detailed event information. When dates reference 'next Tuesday' or similar relative dates, use this current date as reference.",
+    if PROVIDER == "openai":
+        # openai model response
+        completion = client.beta.chat.completions.parse(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{date_context} Extract detailed event information. When dates reference 'next Tuesday' or similar relative dates, use this current date as reference.",
+                },
+                {"role": "user", "content": description},
+            ],
+            response_format=EventDetails,
+        )
+        result = completion.choices[0].message.parsed
+    else:
+        # local model response
+        event_details_schema = EventDetails.model_json_schema()
+
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": f"{date_context} Extract detailed event information. When dates reference 'next Tuesday' or similar relative dates, use this current date as reference.",
+                },
+                {"role": "user", "content": description},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "event_details_schema",
+                    "schema": event_details_schema,
+                    "strict": True,
+                },
             },
-            {"role": "user", "content": description},
-        ],
-        response_format=EventDetails,
-    )
-    result = completion.choices[0].message.parsed
+        )
+
+        message = completion.choices[0].message
+        # Check if reasoning_content exists in the raw response
+        raw_resp = completion.model_dump()
+        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+        content = message.content or ""
+
+        # Use reasoning if content is empty (common in Qwen 3.5 bug)
+        final_json = content if content.strip() else reasoning
+
+        if not final_json:
+            raise ValueError("Both content and reasoning_content are empty.")
+
+        result = EventDetails.model_validate_json(final_json)
+
     logger.info(
         f"Parsed event details - Name: {result.name}, Date: {result.date}, Duration: {result.duration_minutes}min"
     )
@@ -125,18 +204,57 @@ def generate_confirmation(event_details: EventDetails) -> EventConfirmation:
     """Third LLM call to generate a confirmation message"""
     logger.info("Generating confirmation message")
 
-    completion = client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {
-                "role": "system",
-                "content": "Generate a natural confirmation message for the event. Sign of with your name; Susie",
+    if PROVIDER == "openai":
+        # openai model response
+        completion = client.beta.chat.completions.parse(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Generate a natural confirmation message for the event. Sign of with your name; Susie",
+                },
+                {"role": "user", "content": str(event_details.model_dump())},
+            ],
+            response_format=EventConfirmation,
+        )
+        result = completion.choices[0].message.parsed
+    else:
+        # local model response
+        event_confirm_schema = EventConfirmation.model_json_schema()
+
+        completion = client.chat.completions.create(
+            model=model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Generate a natural confirmation message for the event. Sign of with your name; Susie",
+                },
+                {"role": "user", "content": str(event_details.model_dump())},
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "event_confirm_schema",
+                    "schema": event_confirm_schema,
+                    "strict": True,
+                },
             },
-            {"role": "user", "content": str(event_details.model_dump())},
-        ],
-        response_format=EventConfirmation,
-    )
-    result = completion.choices[0].message.parsed
+        )
+
+        message = completion.choices[0].message
+        # Check if reasoning_content exists in the raw response
+        raw_resp = completion.model_dump()
+        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
+        content = message.content or ""
+
+        # Use reasoning if content is empty (common in Qwen 3.5 bug)
+        final_json = content if content.strip() else reasoning
+
+        if not final_json:
+            raise ValueError("Both content and reasoning_content are empty.")
+
+        result = EventConfirmation.model_validate_json(final_json)
+
     logger.info("Confirmation message generated successfully")
     return result
 
