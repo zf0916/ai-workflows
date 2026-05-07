@@ -1,22 +1,12 @@
 import json
-import sys
-from pathlib import Path
-
 import requests
 from pydantic import BaseModel, Field
 
-# root path for helper import
-root_path = str(Path(__file__).parent.parent.parent)
-
-if root_path not in sys.path:
-    sys.path.append(root_path)
-
 from utils.llm_config import get_llm_client
+from utils.llm_completion import get_completion
 
 # LLM Selection
 PROVIDER = "lmstudio"
-
-# Initialize
 client, model = get_llm_client(PROVIDER)
 
 """
@@ -136,36 +126,9 @@ class WeatherResponse(BaseModel):
 
 # Call the standard completions endpoint
 
-if PROVIDER == "openai":
-    # openai models response (using .parse and tools included)
-    completion_2 = client.beta.chat.completions.parse(
-        model=model,
-        messages=messages,
-        tools=tools,
-        response_format=WeatherResponse,
-    )
-
-    final_response = completion_2.choices[0].message.content
-else:
-    # local models response (using .create and tools omitted)
-    weather_schema = WeatherResponse.model_json_schema()
-
-    completion_2 = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "weather_response_schema",
-                "schema": weather_schema,
-                "strict": True,
-            },
-        },
-    )
-
-    final_response = WeatherResponse.model_validate_json(
-        completion_2.choices[0].message.content
-    )
+final_response = get_completion(
+    PROVIDER, client, model, messages, tools, WeatherResponse
+)
 
 # --------------------------------------------------------------
 # Step 5: Check model response

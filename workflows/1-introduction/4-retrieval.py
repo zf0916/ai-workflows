@@ -1,21 +1,11 @@
 import json
-import sys
-from pathlib import Path
-
 from pydantic import BaseModel, Field
 
-# root path for helper import
-root_path = str(Path(__file__).parent.parent.parent)
-
-if root_path not in sys.path:
-    sys.path.append(root_path)
-
 from utils.llm_config import get_llm_client
+from utils.llm_completion import get_completion
 
 # LLM Selection
 PROVIDER = "lmstudio"
-
-# Initialize
 client, model = get_llm_client(PROVIDER)
 
 """
@@ -108,36 +98,9 @@ class KBResponse(BaseModel):
     source: int = Field(description="The record id of the answer.")
 
 
-if PROVIDER == "openai":
-    # openai models response (using .parse and tools included)
-    completion_2 = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=messages,
-        tools=tools,
-        response_format=KBResponse,
-    )
-
-    final_response = completion_2.choices[0].message.parsed
-else:
-    # local models response (using .create and tools omitted)
-    kb_schema = KBResponse.model_json_schema()
-
-    completion_2 = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        response_format={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "KB_response_schema",
-                "schema": kb_schema,
-                "strict": True,
-            },
-        },
-    )
-
-    final_response = KBResponse.model_validate_json(
-        completion_2.choices[0].message.content
-    )
+final_response = get_completion(
+    PROVIDER, client, model, messages, tools, response_format=KBResponse
+)
 
 # --------------------------------------------------------------
 # Step 5: Check model response
@@ -155,17 +118,6 @@ messages = [
     {"role": "user", "content": "What is the weather in Tokyo?"},
 ]
 
-if PROVIDER == "openai":
-    completion_3 = client.beta.chat.completions.parse(
-        model=model,
-        messages=messages,
-        tools=tools,
-    )
-else:
-    completion_3 = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        tools=tools,
-    )
-
-completion_3.choices[0].message.content
+response = get_completion(
+    PROVIDER, client, model, messages, tools=None, response_format=None
+)

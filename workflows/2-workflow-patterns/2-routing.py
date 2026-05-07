@@ -1,8 +1,9 @@
 from typing import Optional, Literal
 from pydantic import BaseModel, Field
 import logging
-import sys
-from pathlib import Path
+
+from utils.llm_config import get_llm_client
+from utils.llm_completion import get_completion
 
 # Set up logging configuration
 logging.basicConfig(
@@ -12,18 +13,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# root path for helper import
-root_path = str(Path(__file__).parent.parent.parent)
-
-if root_path not in sys.path:
-    sys.path.append(root_path)
-
-from utils.llm_config import get_llm_client
 
 # LLM Selection
 PROVIDER = "lmstudio"
-
-# Initialize
 client, model = get_llm_client(PROVIDER)
 
 # --------------------------------------------------------------
@@ -85,55 +77,17 @@ def route_calendar_request(user_input: str) -> CalendarRequestType:
     """Router LLM call to determine the type of calendar request"""
     logger.info("Routing calendar request")
 
-    if PROVIDER == "openai":
-        # openai model response
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Determine if this is a request to create a new calendar event or modify an existing one.",
-                },
-                {"role": "user", "content": user_input},
-            ],
-            response_format=CalendarRequestType,
-        )
-        result = completion.choices[0].message.parsed
-    else:
-        # local model response
-        request_schema = CalendarRequestType.model_json_schema()
+    messages = [
+        {"role": "system", "content": "Extract the event information."},
+        {
+            "role": "user",
+            "content": "Alice and Bob are going to a science fair on Friday.",
+        },
+    ]
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Determine if this is a request to create a new calendar event or modify an existing one.",
-                },
-                {"role": "user", "content": user_input},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "request_schema",
-                    "schema": request_schema,
-                    "strict": True,
-                },
-            },
-        )
-        message = completion.choices[0].message
-        # Check if reasoning_content exists in the raw response
-        raw_resp = completion.model_dump()
-        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
-        content = message.content or ""
-
-        # Use reasoning if content is empty (common in Qwen 3.5 bug)
-        final_json = content if content.strip() else reasoning
-
-        if not final_json:
-            raise ValueError("Both content and reasoning_content are empty.")
-
-        result = CalendarRequestType.model_validate_json(final_json)
+    result = get_completion(
+        PROVIDER, client, model, messages, response_format=CalendarRequestType
+    )
 
     logger.info(
         f"Request routed as: {result.request_type} with confidence: {result.confidence_score}"
@@ -146,55 +100,17 @@ def handle_new_event(description: str) -> CalendarResponse:
     logger.info("Processing new event request")
 
     # Get event details
-    if PROVIDER == "openai":
-        # openai model response
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Extract details for creating a new calendar event.",
-                },
-                {"role": "user", "content": description},
-            ],
-            response_format=NewEventDetails,
-        )
-        details = completion.choices[0].message.parsed
-    else:
-        # local model response
-        new_event_schema = NewEventDetails.model_json_schema()
+    messages = [
+        {
+            "role": "system",
+            "content": "Extract details for creating a new calendar event.",
+        },
+        {"role": "user", "content": description},
+    ]
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Extract details for creating a new calendar event.",
-                },
-                {"role": "user", "content": description},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "new_event_schema",
-                    "schema": new_event_schema,
-                    "strict": True,
-                },
-            },
-        )
-        message = completion.choices[0].message
-        # Check if reasoning_content exists in the raw response
-        raw_resp = completion.model_dump()
-        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
-        content = message.content or ""
-
-        # Use reasoning if content is empty (common in Qwen 3.5 bug)
-        final_json = content if content.strip() else reasoning
-
-        if not final_json:
-            raise ValueError("Both content and reasoning_content are empty.")
-
-        details = NewEventDetails.model_validate_json(final_json)
+    details = get_completion(
+        PROVIDER, client, model, messages, response_format=NewEventDetails
+    )
 
     logger.info(f"New event: {details.model_dump_json(indent=2)}")
 
@@ -211,55 +127,17 @@ def handle_modify_event(description: str) -> CalendarResponse:
     logger.info("Processing event modification request")
 
     # Get modification details
-    if PROVIDER == "openai":
-        # openai model response
-        completion = client.beta.chat.completions.parse(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Extract details for modifying an existing calendar event.",
-                },
-                {"role": "user", "content": description},
-            ],
-            response_format=ModifyEventDetails,
-        )
-        details = completion.choices[0].message.parsed
-    else:
-        # local model response
-        modify_schema = ModifyEventDetails.model_json_schema()
+    messages = [
+        {"role": "system", "content": "Extract the event information."},
+        {
+            "role": "user",
+            "content": "Alice and Bob are going to a science fair on Friday.",
+        },
+    ]
 
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Extract details for modifying an existing calendar event.",
-                },
-                {"role": "user", "content": description},
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "modify_schema",
-                    "schema": modify_schema,
-                    "strict": True,
-                },
-            },
-        )
-        message = completion.choices[0].message
-        # Check if reasoning_content exists in the raw response
-        raw_resp = completion.model_dump()
-        reasoning = raw_resp["choices"][0]["message"].get("reasoning_content", "")
-        content = message.content or ""
-
-        # Use reasoning if content is empty (common in Qwen 3.5 bug)
-        final_json = content if content.strip() else reasoning
-
-        if not final_json:
-            raise ValueError("Both content and reasoning_content are empty.")
-
-        details = ModifyEventDetails.model_validate_json(final_json)
+    details = get_completion(
+        PROVIDER, client, model, messages, response_format=ModifyEventDetails
+    )
 
     logger.info(f"Modified event: {details.model_dump_json(indent=2)}")
 
