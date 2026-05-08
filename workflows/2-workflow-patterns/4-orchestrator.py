@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # Set up logging configuration
 logging.basicConfig(
@@ -146,7 +146,7 @@ class BlogOrchestrator:
             }
         ]
 
-        result = get_completion(
+        result = completion_parse(
             PROVIDER, client, model, messages, response_format=OrchestratorPlan
         )
 
@@ -186,7 +186,7 @@ class BlogOrchestrator:
             }
         ]
 
-        result = get_completion(
+        result = completion_parse(
             PROVIDER, client, model, messages, response_format=SectionContent
         )
 
@@ -212,7 +212,7 @@ class BlogOrchestrator:
             }
         ]
 
-        result = get_completion(
+        result = completion_parse(
             PROVIDER, client, model, messages, response_format=ReviewFeedback
         )
 

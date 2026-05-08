@@ -5,7 +5,7 @@ import nest_asyncio
 from pydantic import BaseModel, Field
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion_async
+from utils.llm_parse import completion_parse_async
 
 nest_asyncio.apply()
 
@@ -56,7 +56,7 @@ async def validate_calendar_request(user_input: str) -> CalendarValidation:
         },
     ]
 
-    result = await get_completion_async(
+    result = await completion_parse_async(
         PROVIDER, client, model, messages, response_format=CalendarValidation
     )
 
@@ -74,7 +74,7 @@ async def check_security(user_input: str) -> SecurityCheck:
         },
     ]
 
-    result = await get_completion_async(
+    result = await completion_parse_async(
         PROVIDER, client, model, messages, response_format=SecurityCheck
     )
 

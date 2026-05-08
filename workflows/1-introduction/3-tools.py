@@ -3,7 +3,7 @@ import requests
 from pydantic import BaseModel, Field
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # LLM Selection
 PROVIDER = "lmstudio"
@@ -126,7 +126,7 @@ class WeatherResponse(BaseModel):
 
 # Call the standard completions endpoint
 
-final_response = get_completion(
+final_response = completion_parse(
     PROVIDER, client, model, messages, tools, WeatherResponse
 )
 

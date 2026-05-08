@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # Set up logging configuration
 logging.basicConfig(
@@ -85,7 +85,7 @@ def route_calendar_request(user_input: str) -> CalendarRequestType:
         },
     ]
 
-    result = get_completion(
+    result = completion_parse(
         PROVIDER, client, model, messages, response_format=CalendarRequestType
     )
 
@@ -108,7 +108,7 @@ def handle_new_event(description: str) -> CalendarResponse:
         {"role": "user", "content": description},
     ]
 
-    details = get_completion(
+    details = completion_parse(
         PROVIDER, client, model, messages, response_format=NewEventDetails
     )
 
@@ -135,7 +135,7 @@ def handle_modify_event(description: str) -> CalendarResponse:
         },
     ]
 
-    details = get_completion(
+    details = completion_parse(
         PROVIDER, client, model, messages, response_format=ModifyEventDetails
     )
 

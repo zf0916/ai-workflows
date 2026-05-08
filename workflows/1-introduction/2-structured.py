@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # LLM Selection
 PROVIDER = "lmstudio"
@@ -31,7 +31,9 @@ messages = [
 ]
 
 
-event = get_completion(PROVIDER, client, model, messages, response_format=CalendarEvent)
+event = completion_parse(
+    PROVIDER, client, model, messages, response_format=CalendarEvent
+)
 
 # --------------------------------------------------------------
 # Step 3: Parse the response

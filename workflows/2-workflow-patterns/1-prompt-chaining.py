@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # Set up logging configuration
 logging.basicConfig(
@@ -77,7 +77,7 @@ def extract_event_info(user_input: str) -> EventExtraction:
         {"role": "user", "content": user_input},
     ]
 
-    result = get_completion(
+    result = completion_parse(
         PROVIDER, client, model, messages, response_format=EventExtraction
     )
 
@@ -103,7 +103,7 @@ def parse_event_details(description: str) -> EventDetails:
         {"role": "user", "content": description},
     ]
 
-    result = get_completion(
+    result = completion_parse(
         PROVIDER, client, model, messages, response_format=EventDetails
     )
 
@@ -126,7 +126,7 @@ def generate_confirmation(event_details: EventDetails) -> EventConfirmation:
         {"role": "user", "content": str(event_details.model_dump())},
     ]
 
-    result = get_completion(
+    result = completion_parse(
         PROVIDER, client, model, messages, response_format=EventConfirmation
     )
 

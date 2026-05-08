@@ -2,7 +2,7 @@ import json
 from pydantic import BaseModel, Field
 
 from utils.llm_config import get_llm_client
-from utils.llm_completion import get_completion
+from utils.llm_parse import completion_parse
 
 # LLM Selection
 PROVIDER = "lmstudio"
@@ -98,7 +98,7 @@ class KBResponse(BaseModel):
     source: int = Field(description="The record id of the answer.")
 
 
-final_response = get_completion(
+final_response = completion_parse(
     PROVIDER, client, model, messages, tools, response_format=KBResponse
 )
 
@@ -118,6 +118,14 @@ messages = [
     {"role": "user", "content": "What is the weather in Tokyo?"},
 ]
 
-response = get_completion(
-    PROVIDER, client, model, messages, tools=None, response_format=None
+# response = completion_parse(
+#     PROVIDER, client, model, messages, tools=None, response_format=None
+# )
+
+completion_3 = client.beta.chat.completions.parse(
+    model=model,
+    messages=messages,
+    tools=tools,
 )
+
+completion_3.choices[0].message.content
